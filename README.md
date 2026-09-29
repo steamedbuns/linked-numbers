@@ -18,7 +18,8 @@ Then open a new WSL terminal (or run `wsl --shutdown` from Windows) so the `dock
 
 ### 2. Enter the dev environment
 
-**VS Code:** open the repo in a WSL window and run **Dev Containers: Reopen in Container**. You need the Dev Containers extension.
+**VS Code:** open the repo in a WSL window (**WSL: Connect to WSL**, or `code .` from a WSL terminal), then run **Dev Containers: Reopen in Container**. You need the WSL and Dev Containers extensions.
+Docker is installed only inside WSL; there's no Docker Desktop. If you start from a plain Windows window, you get `Executable 'docker' not found on PATH 'C:\WINDOWS\...'`. Either reopen through WSL, or add `"dev.containers.executeInWSL": true` to your VS Code user settings.
 
 **Terminal only:**
 
