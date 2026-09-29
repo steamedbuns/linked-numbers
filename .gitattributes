@@ -1,3 +1,6 @@
 * text=auto eol=lf
 *.sh text eol=lf
 dev text eol=lf
+# Lock files: collapsed in GitHub diffs and left out of language stats.
+web/pubspec.lock linguist-generated=true
+services/go.sum linguist-generated=true

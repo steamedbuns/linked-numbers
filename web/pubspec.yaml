@@ -1,0 +1,10 @@
+name: linked_numbers_web
+description: The Linked Numbers browser app.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.32.0
