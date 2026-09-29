@@ -1,0 +1,82 @@
+# Lint and unit tests on every PR. Each job runs the same `make` target devs
+# run locally (`./dev run make check`), with tool versions read from
+# .devcontainer/Dockerfile. `CI` is the only required check on main; see
+# docs/adr/0002-ci-pipeline.md.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go lint + test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: v
+        run: scripts/ci/tool-versions.sh
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.v.outputs.go }}
+          cache-dependency-path: services/go.*
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v${{ steps.v.outputs.golangci_lint }}
+          install-only: true
+      - run: make lint-go
+      - run: make test-go
+
+  web:
+    name: Dart lint + test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: v
+        run: scripts/ci/tool-versions.sh
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: ${{ steps.v.outputs.dart }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ steps.v.outputs.dart }}-${{ hashFiles('web/pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-${{ steps.v.outputs.dart }}-
+      - run: make lint-web
+      - run: make test-web
+
+  api:
+    name: OpenAPI lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: v
+        run: scripts/ci/tool-versions.sh
+      - run: npm install -g "@redocly/cli@${{ steps.v.outputs.redocly }}"
+      - run: make lint-api
+
+  # The one required status check. It fails unless every job above succeeded,
+  # so jobs can be added or renamed without touching the ruleset.
+  ci:
+    name: CI
+    if: always()
+    needs: [go, web, api]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null || { echo "$NEEDS"; exit 1; }

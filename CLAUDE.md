@@ -43,6 +43,5 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 - Name branches `LN-<epic>_<story>/<short_description>` (e.g. `LN-1_1/initial_setup`), and put the story ID in the PR title.
 - Keep PRs under about 400 changed lines. Each PR needs a description and a self-review, plus screenshots for UI changes.
 - Definition of done (spec, "Definition of done"): every acceptance criterion has an automated test, lint and format are clean, new endpoints are in OpenAPI, and new code paths emit spans and structured logs.
-- Before calling work done, run the relevant checks inside the container, for example:
-  - Go: `./dev run bash -c 'cd services && golangci-lint run && go test -race ./...'`
-  - Dart: `./dev run bash -c 'cd web && dart analyze && dart run build_runner test'`
+- Before calling work done, run `./dev run make check`. It runs exactly what CI runs (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). Single areas: `make lint-go test-go`, `make lint-web test-web`, `make lint-api`.
+- CI's `CI` check is required on `main`. When you add a check, add it as a Makefile target and call that target from a workflow job. Don't change the ruleset.

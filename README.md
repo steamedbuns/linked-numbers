@@ -30,6 +30,15 @@ The stack uses fixed ports, so run it from only one checkout or worktree at a ti
 | [`deploy/`](deploy/) | Docker Compose now; Kustomize and observability config later |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
 
+## CI
+
+[GitHub Actions](.github/workflows/ci.yml) runs Go lint and tests, Dart format, analyze and tests, and the OpenAPI lint on every PR, with tool versions read from the dev container's Dockerfile.
+The `CI` check must pass before a PR can merge into `main`. To run the same checks locally:
+
+```bash
+./dev run make check
+```
+
 ## Development environment
 
 Everything except Docker runs inside one dev container image

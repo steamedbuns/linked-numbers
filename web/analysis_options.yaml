@@ -1,0 +1,8 @@
+# Checked by `make lint-web` (dart analyze --fatal-infos) locally and in CI.
+include: package:lints/recommended.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
