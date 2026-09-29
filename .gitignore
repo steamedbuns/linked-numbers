@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Dart
+.dart_tool/
+build/
+.packages
+
+# Go
+/bin/
+*.test
+*.out
+coverage/
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+
+# Editors / OS
+.idea/
+.DS_Store

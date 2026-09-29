@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Terminal entry point to the Linked Numbers dev container (same image as
+# .devcontainer/). Keep mounts/runArgs in step with devcontainer.json.
+#
+#   ./dev [shell]      open a bash shell in this checkout's dev container
+#   ./dev run CMD...   run one command in this checkout's dev container
+#   ./dev rebuild      rebuild the image and recreate this checkout's container
+#   ./dev down         stop and remove this checkout's container (caches kept)
+#   ./dev ps           list dev containers for all checkouts/worktrees
+#   ./dev nuke         remove all dev containers, images and cache volumes
+#
+# Each checkout (the main clone or any git worktree) gets its own container,
+# named after its path, so parallel agents never run against each other's
+# files. Images are tagged by a hash of .devcontainer/ and shared between
+# checkouts whose dev config is identical; cache volumes are always shared.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_IMAGE=linked-numbers-dev
+CONFIG_HASH="$(cat "$ROOT"/.devcontainer/* | sha256sum | cut -c1-16)"
+IMAGE="$REPO_IMAGE:$CONFIG_HASH"
+ROOT_HASH="$(printf '%s' "$ROOT" | sha256sum | cut -c1-8)"
+CONTAINER="linked-numbers-dev-$(printf %s "${ROOT##*/}" | tr -c 'a-zA-Z0-9_.-' '-' | cut -c1-40)-$ROOT_HASH"
+LABEL=ln.dev-root
+VOLUMES=(ln-gomod ln-gocache ln-pub ln-npm ln-playwright)
+
+die() { echo "dev: $*" >&2; exit 1; }
+docker info >/dev/null 2>&1 || die "docker is not reachable; run scripts/host/install-docker-wsl.sh first"
+
+build() {
+  docker build -t "$IMAGE" "$ROOT/.devcontainer"
+  # Drop older tags of the dev image; ones still used by a container are kept.
+  docker image ls "$REPO_IMAGE" --format '{{.Repository}}:{{.Tag}}' \
+    | grep -vx "$IMAGE" | xargs -r docker image rm >/dev/null 2>&1 || true
+}
+
+container_image() { docker container inspect -f '{{.Config.Image}}' "$CONTAINER" 2>/dev/null || true; }
+running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" == true ]]; }
+remove_container() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
+
+up() {
+  # Serialize first start so parallel `./dev run` calls don't race to create it.
+  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/ln-dev-$ROOT_HASH.lock"
+  flock 9
+
+  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "dev: building image (first run or .devcontainer/ changed)..." >&2
+    build >&2
+  fi
+  local have
+  have="$(container_image)"
+  [[ -n "$have" && "$have" != "$IMAGE" ]] && remove_container
+  if ! running; then
+    if [[ -n "$(container_image)" ]]; then
+      docker start "$CONTAINER" >/dev/null
+    else
+      create
+    fi
+  fi
+
+  flock -u 9
+}
+
+create() {
+  local mounts=(-v "$ROOT:$ROOT")
+  # In a worktree, .git points at the main repo's git dir; mount it too so git
+  # (and `go build`'s VCS stamping) works inside the container.
+  local git_common
+  git_common="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [[ -n "$git_common" && "$git_common" != "$ROOT"/* ]]; then
+    mounts+=(-v "$git_common:$git_common")
+  fi
+
+  mkdir -p "$HOME/.config/gh"
+  docker run -d --name "$CONTAINER" --label "$LABEL=$ROOT" --network=host \
+    "${mounts[@]}" -w "$ROOT" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v ln-gomod:/home/vscode/go/pkg/mod \
+    -v ln-gocache:/home/vscode/.cache/go-build \
+    -v ln-pub:/home/vscode/.pub-cache \
+    -v ln-npm:/home/vscode/.npm \
+    -v ln-playwright:/home/vscode/.cache/ms-playwright \
+    -v "$HOME/.config/gh:/home/vscode/.config/gh:ro" \
+    "$IMAGE" >/dev/null
+  in_container scripts/dev/post-create.sh >&2
+}
+
+in_container() {
+  local tty=()
+  [[ -t 0 && -t 1 ]] && tty=(-it)
+  # Keep the caller's working directory when it is inside this checkout.
+  local wd="$ROOT"
+  [[ "$PWD" == "$ROOT" || "$PWD" == "$ROOT"/* ]] && wd="$PWD"
+  docker exec "${tty[@]}" -u vscode -w "$wd" "$CONTAINER" "$@"
+}
+
+cmd="${1:-shell}"
+[[ $# -gt 0 ]] && shift
+case "$cmd" in
+  shell)   up; in_container bash ;;
+  run)     [[ $# -gt 0 ]] || die "usage: ./dev run CMD..."; up; in_container "$@" ;;
+  rebuild) remove_container; build; up ;;
+  down)    remove_container ;;
+  ps)      docker ps -a --filter "label=$LABEL" --format "table {{.Names}}\t{{.Status}}\t{{.Label \"$LABEL\"}}" ;;
+  nuke)
+    docker ps -aq --filter "label=$LABEL" | xargs -r docker rm -f >/dev/null
+    docker image ls -q "$REPO_IMAGE" | sort -u | xargs -r docker image rm -f >/dev/null
+    docker volume rm "${VOLUMES[@]}" >/dev/null 2>&1 || true
+    echo "dev: removed all dev containers, images and cache volumes"
+    ;;
+  -h|--help|help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command '$cmd' (try ./dev help)" ;;
+esac

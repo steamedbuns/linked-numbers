@@ -1,0 +1,45 @@
+// Keep mounts/runArgs in step with ./dev (the terminal-only entry point).
+{
+  "name": "linked-numbers",
+  "build": { "dockerfile": "Dockerfile" },
+  "overrideCommand": false,
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  // Same path as on the host so bind mounts in compose/kind configs resolve
+  // on the host Docker daemon.
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "runArgs": ["--network=host"],
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=ln-gomod,target=/home/vscode/go/pkg/mod,type=volume",
+    "source=ln-gocache,target=/home/vscode/.cache/go-build,type=volume",
+    "source=ln-pub,target=/home/vscode/.pub-cache,type=volume",
+    "source=ln-npm,target=/home/vscode/.npm,type=volume",
+    "source=ln-playwright,target=/home/vscode/.cache/ms-playwright,type=volume",
+    "source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh,type=bind,readonly"
+  ],
+  "initializeCommand": "mkdir -p \"$HOME/.config/gh\"",
+  "postCreateCommand": "scripts/dev/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "Dart-Code.dart-code",
+        "ms-azuretools.vscode-containers",
+        "redhat.vscode-yaml",
+        "ms-playwright.playwright",
+        "Redocly.openapi-vs-code",
+        "bierner.markdown-mermaid",
+        "github.vscode-github-actions",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": false,
+        "go.toolsManagement.checkForUpdates": "off",
+        "dart.sdkPath": "/usr/lib/dart",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
