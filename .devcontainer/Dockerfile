@@ -21,6 +21,7 @@ ARG GOVULNCHECK_VERSION=1.8.0
 ARG GOTESTSUM_VERSION=1.13.0
 ARG WEBDEV_VERSION=4.0.3
 ARG REDOCLY_VERSION=2.55.0
+ARG DEVCONTAINER_CLI_VERSION=0.89.0
 ARG K6_VERSION=2.3.0
 ARG KIND_VERSION=0.33.0
 ARG KUBECTL_VERSION=1.37.1
@@ -63,7 +64,7 @@ RUN curl -fsSLo /tmp/dart.zip \
 # ---- Node.js -----------------------------------------------------------------
 RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
       | tar -C /usr/local --strip-components=1 -xJ \
- && npm install -g "@redocly/cli@${REDOCLY_VERSION}" \
+ && npm install -g "@redocly/cli@${REDOCLY_VERSION}" "@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}" \
  && npx -y "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium \
  && rm -rf /var/lib/apt/lists/* /root/.npm
 

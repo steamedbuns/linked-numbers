@@ -26,8 +26,9 @@ Then open a new WSL terminal (or run `wsl --shutdown` from Windows) so the `dock
 ./dev
 ```
 
-`./dev run <cmd>` runs a single command, `./dev rebuild` picks up Dockerfile changes, `./dev down` stops the container, and `./dev ps` lists containers.
-Each checkout, including every git worktree, gets its own container. The image rebuilds automatically when `.devcontainer/` changes.
+`./dev run <cmd>` runs a single command, `./dev rebuild` picks up `.devcontainer/` changes, `./dev down` removes the container, and `./dev ps` lists containers.
+
+`./dev` creates containers with the [devcontainer CLI](https://github.com/devcontainers/cli) from the same `devcontainer.json` VS Code uses. So VS Code and `./dev` share **one container per checkout**, named `linked-numbers-dev-<folder name>`, and whichever starts first creates it. Each git worktree gets its own container. Worktree folders need distinct names, because the name comes from the folder.
 
 ### 3. Check the toolchain
 
@@ -39,7 +40,7 @@ Each checkout, including every git worktree, gets its own container. The image r
 
 - **Docker-outside-of-Docker.** The container uses the host's Docker socket. Compose stacks, testcontainers and kind clusters run as sibling containers on the host.
 - **Host networking.** Every port you start (Postgres, Jaeger, `webdev serve`, and so on) is on `localhost`, and you can open it straight from the Windows browser.
-- **Same-path mount.** The repo is mounted at the same absolute path it has on the host, so relative bind mounts in compose files work.
+- **Same-path mount.** The repo is mounted at the same absolute path it has on the host, so relative bind mounts in compose files work. For a worktree started with `./dev`, the main repo's `.git` is mounted too, so git works inside it. A worktree container created by VS Code doesn't get that mount; run `./dev rebuild` in the worktree if you need git inside it.
 - **Cache volumes.** Go, pub, npm and Playwright caches live in the named volumes `ln-*` and survive rebuilds.
 - **Secrets.** `.env` is created from [.env.example](.env.example) on first start. It is git-ignored; put the LLM key there.
 
