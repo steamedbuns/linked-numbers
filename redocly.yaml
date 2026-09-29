@@ -1,0 +1,5 @@
+# Config for `redocly lint api/openapi.yaml`.
+extends:
+  - recommended
+rules:
+  no-server-example.com: off # the local server URL is intentional

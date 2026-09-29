@@ -21,12 +21,10 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 
 ## Repo layout
 
-Some of these folders don't exist yet; they are created in LN-1.1.
-
 - `/web`: Dart 3 + OverReact app (function components + hooks; the history panel is a `UiComponent2` class component), OverReact Redux, built_value.
 - `/services`: one Go module, with one `cmd/<name>` per binary: `values-api`, `realtime-gateway`, `explain-api`.
 - `/api/openapi.yaml`: the API source of truth. Update it with every endpoint change.
-- `/deploy`: Docker Compose, Kustomize (kind), and observability config.
+- `/deploy`: Docker Compose, Kustomize (kind), and observability config. `./dev run make up` starts the local Postgres + Jaeger stack (`make down` stops it, `make clean` also drops the data); `./dev run scripts/dev/smoke-up.sh` checks it end to end.
 - `/docs/adr`: ADRs. Add one for every new decision.
 - `.devcontainer/`, `dev`, `scripts/dev/`: the dev environment (LN-0).
 

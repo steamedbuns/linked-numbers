@@ -1,0 +1,34 @@
+# Local infrastructure for development. Start it from the repo root with
+# `make up` (or `./dev run make up`). Credentials are local-only defaults, not
+# secrets; override them in .env if you like.
+name: linked-numbers
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-linked_numbers}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-linked_numbers}
+      POSTGRES_DB: ${POSTGRES_DB:-linked_numbers}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # All-in-one Jaeger v2: OTLP receivers, in-memory storage and the UI.
+  # The image has no shell, so there is no healthcheck; scripts/dev/smoke-up.sh
+  # polls the UI from outside instead.
+  jaeger:
+    image: jaegertracing/jaeger:2.21.0
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+
+volumes:
+  pgdata:
