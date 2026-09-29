@@ -1,0 +1,5 @@
+# Tests run in Chrome: components need a DOM and the React JS bundle, which
+# test/html_template.html loads. Run them with `make test-web`
+# (dart run build_runner test), not plain `dart test`.
+platforms: [chrome]
+custom_html_template_path: test/html_template.html
