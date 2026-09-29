@@ -1,6 +1,35 @@
 # linked-numbers
 Linked numbers demo project
 
+## Quick start
+
+On a clean machine you need only Docker (see step 1 below for WSL2). From the repo root:
+
+```bash
+scripts/host/install-docker-wsl.sh   # once per machine, then open a new terminal
+./dev run make up                    # builds the dev container on first run, then starts Postgres and Jaeger
+./dev run scripts/dev/smoke-up.sh    # optional: checks the stack end to end
+```
+
+| Service | Where |
+| --- | --- |
+| Postgres 16 | `localhost:5432`, user/password/db `linked_numbers` (`./dev run make psql`) |
+| Jaeger UI | http://localhost:16686 |
+| OTLP (traces) | `localhost:4317` (gRPC), `localhost:4318` (HTTP) |
+
+`./dev run make down` stops the stack and keeps the data; `./dev run make clean` also deletes it. `./dev run make` lists every target.
+The stack uses fixed ports, so run it from only one checkout or worktree at a time.
+
+## Repo layout
+
+| Folder | Contents |
+| --- | --- |
+| [`web/`](web/) | Dart 3 + OverReact app |
+| [`services/`](services/) | Go module: `values-api`, `realtime-gateway`, `explain-api` |
+| [`api/`](api/) | `openapi.yaml`, the API source of truth |
+| [`deploy/`](deploy/) | Docker Compose now; Kustomize and observability config later |
+| [`docs/adr/`](docs/adr/) | Architecture decision records |
+
 ## Development environment
 
 Everything except Docker runs inside one dev container image
@@ -48,5 +77,3 @@ Docker is installed only inside WSL; there's no Docker Desktop. If you start fro
 ### Uninstall
 
 `./dev nuke` removes every dev container (for all worktrees), the images and the cache volumes. Optionally, also remove Docker with `sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`.
-
-`make up` and the project folders are added in LN-1.1.

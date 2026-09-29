@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Linked Numbers API
+  version: 0.1.0
+  description: |
+    Source of truth for every REST endpoint. Update it with every endpoint change.
+    All calls send `X-User-Id` and `traceparent`; errors use RFC 9457 problem+json.
+    Amounts travel as decimal strings, e.g. "1250000.0000".
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://localhost:8080
+    description: values-api (local)
+security: []
+paths: {}
+components:
+  schemas:
+    Problem:
+      description: RFC 9457 problem details.
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
