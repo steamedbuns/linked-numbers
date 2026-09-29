@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Terminal entry point to the Linked Numbers dev container (same image as
+# .devcontainer/). Keep mounts/runArgs in step with devcontainer.json.
+#
+#   ./dev [shell]      open a bash shell in the dev container (builds/starts it)
+#   ./dev run CMD...   run one command in the dev container
+#   ./dev rebuild      rebuild the image and recreate the container
+#   ./dev down         stop and remove the container (caches are kept)
+#   ./dev nuke         remove the container, image and cache volumes
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMAGE=linked-numbers-dev
+CONTAINER=linked-numbers-dev
+VOLUMES=(ln-gomod ln-gocache ln-pub ln-npm ln-playwright)
+
+die() { echo "dev: $*" >&2; exit 1; }
+docker info >/dev/null 2>&1 || die "docker is not reachable; run scripts/host/install-docker-wsl.sh first"
+
+config_hash() { cat "$ROOT"/.devcontainer/* | sha256sum | cut -c1-16; }
+
+build() {
+  docker build --label "ln.config-hash=$(config_hash)" -t "$IMAGE" "$ROOT/.devcontainer"
+}
+
+image_stale() {
+  local have
+  have="$(docker image inspect -f '{{index .Config.Labels "ln.config-hash"}}' "$IMAGE" 2>/dev/null || true)"
+  [[ "$have" != "$(config_hash)" ]]
+}
+
+running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" == true ]]; }
+
+remove_container() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
+
+up() {
+  if image_stale; then
+    echo "dev: building image (first run or .devcontainer/ changed)..."
+    build
+    remove_container
+  fi
+  running && return
+  if docker container inspect "$CONTAINER" >/dev/null 2>&1; then
+    docker start "$CONTAINER" >/dev/null
+    return
+  fi
+  mkdir -p "$HOME/.config/gh"
+  docker run -d --name "$CONTAINER" --network=host \
+    -v "$ROOT:$ROOT" -w "$ROOT" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v ln-gomod:/home/vscode/go/pkg/mod \
+    -v ln-gocache:/home/vscode/.cache/go-build \
+    -v ln-pub:/home/vscode/.pub-cache \
+    -v ln-npm:/home/vscode/.npm \
+    -v ln-playwright:/home/vscode/.cache/ms-playwright \
+    -v "$HOME/.config/gh:/home/vscode/.config/gh:ro" \
+    "$IMAGE" >/dev/null
+  in_container scripts/dev/post-create.sh
+}
+
+in_container() {
+  local tty=()
+  [[ -t 0 && -t 1 ]] && tty=(-it)
+  # Keep the caller's working directory when it is inside the repo.
+  local wd="$ROOT"
+  [[ "$PWD" == "$ROOT"* ]] && wd="$PWD"
+  docker exec "${tty[@]}" -u vscode -w "$wd" "$CONTAINER" "$@"
+}
+
+cmd="${1:-shell}"
+[[ $# -gt 0 ]] && shift
+case "$cmd" in
+  shell)   up; in_container bash ;;
+  run)     [[ $# -gt 0 ]] || die "usage: ./dev run CMD..."; up; in_container "$@" ;;
+  rebuild) remove_container; build; up ;;
+  down)    remove_container ;;
+  nuke)
+    remove_container
+    docker image rm -f "$IMAGE" >/dev/null 2>&1 || true
+    docker volume rm "${VOLUMES[@]}" >/dev/null 2>&1 || true
+    echo "dev: removed container, image and cache volumes"
+    ;;
+  -h|--help|help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command '$cmd' (try ./dev help)" ;;
+esac
