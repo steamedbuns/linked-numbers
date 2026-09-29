@@ -9,14 +9,13 @@
 #   ./dev nuke         remove all dev containers, images and cache volumes
 #
 # Containers are created by the devcontainer CLI from
-# .devcontainer/devcontainer.json -- the same config and the same container
-# lookup labels VS Code uses. So "Reopen in Container" and ./dev share one
+# .devcontainer/devcontainer.json -- the same config VS Code uses, and ./dev
+# reuses any container VS Code created. So "Reopen in Container" and ./dev share one
 # container per checkout (named linked-numbers-dev-<folder name>), whichever
 # of them starts it first. Each git worktree gets its own container.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG="$ROOT/.devcontainer/devcontainer.json"
 # Image that only runs the devcontainer CLI; built from the same Dockerfile,
 # so it shares every layer with the dev image.
 TOOLS_IMAGE="linked-numbers-dev-tools:$(cat "$ROOT"/.devcontainer/* | sha256sum | cut -c1-16)"
@@ -25,10 +24,12 @@ VOLUMES=(ln-gomod ln-gocache ln-pub ln-npm ln-playwright)
 die() { echo "dev: $*" >&2; exit 1; }
 docker info >/dev/null 2>&1 || die "docker is not reachable; run scripts/host/install-docker-wsl.sh first"
 
-# The container for this checkout, found the way VS Code finds it.
+# The container for this checkout. It is looked up by our own ln.dev-root label
+# (set in devcontainer.json runArgs), not devcontainer.local_folder: VS Code
+# opened from a Windows window sets local_folder to a \\wsl.localhost\... path,
+# while ln.dev-root always holds the Linux path.
 container() {
-  docker ps -aq --filter "label=devcontainer.local_folder=$ROOT" \
-                --filter "label=devcontainer.config_file=$CONFIG" | head -n1
+  docker ps -aq --filter "label=ln.dev-root=$ROOT" | head -n1
 }
 
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" == true ]]; }
@@ -58,7 +59,12 @@ up() {
 
   local cid
   cid="$(container)"
-  if [[ -z "$cid" ]] || ! running "$cid"; then
+  if [[ -n "$cid" ]] && ! running "$cid"; then
+    # Start it directly: `devcontainer up` finds containers by local_folder, so
+    # it misses one VS Code created from Windows and tries to create a second.
+    # Post-create already ran when the container was created.
+    docker start "$cid" >/dev/null || die "could not start dev container $cid"
+  elif [[ -z "$cid" ]]; then
     mkdir -p "$HOME/.config/gh"
     # In a worktree, .git points into the main repo's git dir; mount it at the
     # same path so git (and `go build` VCS stamping) works in the container.
@@ -67,7 +73,7 @@ up() {
     if [[ -n "$git_common" && "$git_common" != "$ROOT"/* ]]; then
       extra+=(--mount "type=bind,source=$git_common,target=$git_common")
     fi
-    # Create/start the container and run lifecycle hooks (post-create).
+    # Create the container and run lifecycle hooks (post-create).
     devcontainer_cli up --workspace-folder "$ROOT" "${extra[@]}" >&2 \
       || die "devcontainer up failed (a container named linked-numbers-dev-${ROOT##*/} from another path? see ./dev ps)"
     cid="$(container)"
@@ -93,13 +99,16 @@ in_container() {
 }
 
 # Removes this checkout's container and its per-checkout image (layers are
-# shared, so recreating it later is fast).
+# shared, so recreating it later is fast). The image is kept while any other
+# container still uses it: with the containerd image store, `docker image rm`
+# deletes an image even when a running container depends on it.
 remove_container() {
   local cid image
   cid="$(container)"
   [[ -n "$cid" ]] || return 0
   image="$(docker container inspect -f '{{.Config.Image}}' "$cid")"
   docker rm -f "$cid" >/dev/null
+  [[ -z "$(docker ps -aq --filter "ancestor=$image")" ]] || return 0
   docker image rm "$image" "${image%-uid}" >/dev/null 2>&1 || true
 }
 
