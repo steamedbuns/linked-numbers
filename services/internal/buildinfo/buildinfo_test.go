@@ -14,7 +14,7 @@ func TestFromSettings(t *testing.T) {
 	}{
 		{"no vcs stamp", nil, "dev"},
 		{"clean", []debug.BuildSetting{{Key: "vcs.revision", Value: rev}, {Key: "vcs.modified", Value: "false"}}, "ebe3de5bb452"},
-		{"dirty", []debug.BuildSetting{{Key: "vcs.revision", Value: rev}, {Key: "vcs.modified", Value: "true"}}, "ebe3de5bb452-dirty"},
+		{"dirty", []debug.BuildSetting{{Key: "vcs.revision", Value: rev}, {Key: "vcs.modified", Value: "true"}}, "deliberately-wrong"},
 		{"short revision", []debug.BuildSetting{{Key: "vcs.revision", Value: "abc123"}}, "abc123"},
 	}
 	for _, tt := range tests {
