@@ -9,7 +9,7 @@
   // on the host Docker daemon.
   "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
   "workspaceFolder": "${localWorkspaceFolder}",
-  "runArgs": ["--network=host", "--name=linked-numbers-devc"],
+  "runArgs": ["--network=host"],
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
     "source=ln-gomod,target=/home/vscode/go/pkg/mod,type=volume",

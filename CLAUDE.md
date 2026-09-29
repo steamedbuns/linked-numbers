@@ -15,6 +15,8 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 - Run git and gh on the host as usual.
 - Check the toolchain with `./dev run scripts/dev/doctor.sh` (add `--full` to also test Docker, Postgres and kind).
 - The container uses host networking. Services started with compose, testcontainers or kind are reachable at `localhost` from both the host and the container.
+- Each checkout (the main clone or any git worktree) gets its own container, so `./dev run` from a worktree runs against that worktree's files. `./dev ps` lists them. When you're done with a worktree, run `./dev down` in it before removing it.
+- Every checkout shares the host network, so ports are shared too. Testcontainers use random ports and are safe to run in parallel. Don't start fixed-port stacks (`make up`, `webdev serve`, kind) from two worktrees at once.
 - The container can use the host Docker daemon, so `docker` commands (including `docker rm` and `docker volume rm`) affect the real host. Only remove containers, images or volumes that this project created.
 
 ## Repo layout

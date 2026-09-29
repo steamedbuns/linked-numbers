@@ -26,8 +26,8 @@ Then open a new WSL terminal (or run `wsl --shutdown` from Windows) so the `dock
 ./dev
 ```
 
-`./dev run <cmd>` runs a single command, `./dev rebuild` picks up Dockerfile changes, and `./dev down` stops the container.
-The image rebuilds automatically when `.devcontainer/` changes.
+`./dev run <cmd>` runs a single command, `./dev rebuild` picks up Dockerfile changes, `./dev down` stops the container, and `./dev ps` lists containers.
+Each checkout, including every git worktree, gets its own container. The image rebuilds automatically when `.devcontainer/` changes.
 
 ### 3. Check the toolchain
 
@@ -45,6 +45,6 @@ The image rebuilds automatically when `.devcontainer/` changes.
 
 ### Uninstall
 
-`./dev nuke` removes the container, the image and the cache volumes. Optionally, also remove Docker with `sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`.
+`./dev nuke` removes every dev container (for all worktrees), the images and the cache volumes. Optionally, also remove Docker with `sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`.
 
 `make up` and the project folders are added in LN-1.1.
