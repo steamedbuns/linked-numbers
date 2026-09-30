@@ -10,12 +10,53 @@ info:
     name: Proprietary
     identifier: LicenseRef-Proprietary
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8081
     description: values-api (local)
 security: []
-paths: {}
+tags:
+  - name: ops
+    description: Health probes. Every service serves them on its own port.
+paths:
+  /healthz:
+    get:
+      tags: [ops]
+      operationId: getHealthz
+      summary: Liveness probe
+      description: Returns 200 while the process is serving HTTP. It checks no dependencies.
+      responses:
+        "200":
+          $ref: "#/components/responses/Healthy"
+  /readyz:
+    get:
+      tags: [ops]
+      operationId: getReadyz
+      summary: Readiness probe
+      description: Returns 200 when every readiness check (such as the database ping) passes, and 503 naming the failed checks otherwise.
+      responses:
+        "200":
+          $ref: "#/components/responses/Healthy"
+        "503":
+          description: At least one readiness check failed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
 components:
+  responses:
+    Healthy:
+      description: The service is healthy.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Health"
   schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
     Problem:
       description: RFC 9457 problem details.
       type: object
