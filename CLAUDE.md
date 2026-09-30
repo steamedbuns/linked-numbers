@@ -22,7 +22,7 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 ## Repo layout
 
 - `/web`: Dart 3 + OverReact app (function components + hooks; the history panel is a `UiComponent2` class component), OverReact Redux, built_value. `./dev run make serve-web` serves the web app at http://localhost:8080; `./dev run scripts/dev/smoke-web.sh` checks that it renders.
-- `/services`: one Go module, with one `cmd/<name>` per binary: `values-api`, `realtime-gateway`, `explain-api`.
+- `/services`: one Go module, with one `cmd/<name>` per binary: `values-api` (:8081), `realtime-gateway` (:8082), `explain-api` (:8083). Every `main` is `service.Service{...}.Main()` from `internal/service` (env config, JSON slog, `/healthz`, `/readyz`, graceful SIGTERM; [ADR 0004](docs/adr/0004-go-service-template.md)). Log with the injected logger's `*Context` methods so lines carry `trace_id`. `./dev run bash -c 'cd services && go run ./cmd/values-api'` runs a service.
 - `/api/openapi.yaml`: the API source of truth. Update it with every endpoint change.
 - `/deploy`: Docker Compose, Kustomize (kind), and observability config. `./dev run make up` starts the local Postgres + Jaeger stack (`make down` stops it, `make clean` also drops the data); `./dev run scripts/dev/smoke-up.sh` checks it end to end.
 - `/docs/adr`: ADRs. Add one for every new decision.
