@@ -94,10 +94,11 @@ Every choice below is required. Use the latest stable release of each unless a v
 
 ## Data model
 
-Five Postgres tables. A value's current amount lives in `source_values`. In the same transaction, every change to it adds one row to `value_changes` and sends a notification on channel `values_changed`.
+Six Postgres tables. A value's current amount lives in `source_values`. In the same transaction, every change to it adds one row to `value_changes` and sends a notification on channel `values_changed`.
 
 | Table | Key columns | Rules |
 | --- | --- | --- |
+| `users` | `id` text (e.g. `u_ana`), `display_name`, `created_at` | The user picker's list. `updated_by`, `changed_by` and `created_by` reference it, so `X-User-Id` must name a known user |
 | `source_values` | `id` UUID, `key` text unique (e.g. `rev.q3.2026`), `label`, `amount` NUMERIC(20,4), `unit` (USD, %, count), `period`, `version` int, `updated_at`, `updated_by` | `version` goes up by 1 on each edit, which is how conflicting edits are detected |
 | `value_changes` | `id` bigserial, `value_id`, `old_amount`, `new_amount`, `version`, `reason` text, `changed_by`, `changed_at` | Append-only: no UPDATE or DELETE grants. `reason` must be non-empty. `id` is the event ID in notifications |
 | `reports` | `id` UUID, `title`, `created_by`, `created_at` |  |

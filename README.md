@@ -17,6 +17,7 @@ scripts/host/install-docker-wsl.sh   # once per machine, then open a new termina
 | Jaeger UI | http://localhost:16686 |
 | OTLP (traces) | `localhost:4317` (gRPC), `localhost:4318` (HTTP) |
 
+`./dev run make db-migrate` creates the schema in the local Postgres (see [services/README.md](services/README.md#database)).
 `./dev run make down` stops the stack and keeps the data; `./dev run make clean` also deletes it. `./dev run make` lists every target.
 The stack uses fixed ports, so run it from only one checkout or worktree at a time.
 

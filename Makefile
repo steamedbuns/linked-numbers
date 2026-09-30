@@ -1,11 +1,14 @@
 # Run from the repo root, on the host or with `./dev run make <target>`.
 COMPOSE := docker compose -f deploy/compose/compose.yaml --env-file $(or $(wildcard .env),/dev/null)
+# The local stack's database (same default as .env.example); override to target another.
+DATABASE_URL ?= postgres://linked_numbers:linked_numbers@localhost:5432/linked_numbers?sslmode=disable
+MIGRATIONS := services/internal/db/migrations
 
 .DEFAULT_GOAL := help
-.PHONY: help up down clean ps logs psql serve-web check lint-go test-go lint-web test-web lint-api
+.PHONY: help up down clean ps logs psql db-migrate serve-web check lint-go test-go lint-web test-web lint-api
 
 help: ## List targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-9s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
 
 up: ## Start Postgres and Jaeger and wait until Postgres is healthy
 	$(COMPOSE) up -d --wait
@@ -24,6 +27,9 @@ logs: ## Follow stack logs
 
 psql: ## Open psql on the local database
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+db-migrate: ## Apply pending migrations to DATABASE_URL (default: the local stack)
+	goose -dir $(MIGRATIONS) postgres "$(DATABASE_URL)" up
 
 serve-web: ## Serve the web app at http://localhost:8080
 	cd web && webdev serve web:8080
