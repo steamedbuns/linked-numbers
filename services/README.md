@@ -16,6 +16,8 @@ Every binary starts from the service template ([ADR 0004](../docs/adr/0004-go-se
 | `internal/logging` | JSON slog logger that adds `trace_id`/`span_id` from the context |
 | `internal/httpx` | Request middleware (trace context, access log, panic recovery) and RFC 9457 problem responses |
 | `internal/buildinfo` | The VCS revision, logged as `version` |
+| `internal/db` | Goose migrations (embedded) and `Migrate` ([ADR 0005](../docs/adr/0005-database-schema-and-migrations.md)) |
+| `internal/db/dbtest` | Test helper: one Postgres container per test binary, a fresh migrated database per test |
 
 ## Configuration
 
@@ -31,4 +33,14 @@ Every binary starts from the service template ([ADR 0004](../docs/adr/0004-go-se
 ./dev run bash -c 'cd services && go run ./cmd/values-api'
 ```
 
-Then `curl localhost:8081/healthz` and `curl localhost:8081/readyz`. Migrations, seed data and sqlc arrive in LN-1.5.
+Then `curl localhost:8081/healthz` and `curl localhost:8081/readyz`.
+
+## Database
+
+The schema is in [internal/db/migrations](internal/db/migrations), as goose SQL files. To add a migration, create the next numbered file with `-- +goose Up` and `-- +goose Down` sections:
+
+```bash
+./dev run goose -dir services/internal/db/migrations -s create add_something sql
+```
+
+Apply migrations to the local stack (`make up` first) with `./dev run make db-migrate`. Tests that need Postgres call `dbtest.Main` from `TestMain` and `dbtest.New(t)` per test. They need Docker, which the dev container and CI both have.
