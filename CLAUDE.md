@@ -21,7 +21,7 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 
 ## Repo layout
 
-- `/web`: Dart 3 + OverReact app (function components + hooks; the history panel is a `UiComponent2` class component), OverReact Redux, built_value.
+- `/web`: Dart 3 + OverReact app (function components + hooks; the history panel is a `UiComponent2` class component), OverReact Redux, built_value. `./dev run make serve-web` serves the web app at http://localhost:8080; `./dev run scripts/dev/smoke-web.sh` checks that it renders.
 - `/services`: one Go module, with one `cmd/<name>` per binary: `values-api`, `realtime-gateway`, `explain-api`.
 - `/api/openapi.yaml`: the API source of truth. Update it with every endpoint change.
 - `/deploy`: Docker Compose, Kustomize (kind), and observability config. `./dev run make up` starts the local Postgres + Jaeger stack (`make down` stops it, `make clean` also drops the data); `./dev run scripts/dev/smoke-up.sh` checks it end to end.
@@ -34,7 +34,7 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 - Every value edit writes the new value, exactly one `value_changes` row and a `pg_notify('values_changed', …)`, all in one transaction. `value_changes` is append-only.
 - Only values-api reads or writes the tables. The gateway only LISTENs.
 - Use parameterized SQL only, via sqlc. After changing a query or migration, regenerate (`./dev run bash -c 'cd services && sqlc generate'`) and commit the output. CI fails if it's stale.
-- Generated Dart code (`*.g.dart`) comes from `dart run build_runner build`. Don't edit it by hand.
+- Generated Dart code (`*.g.dart`) comes from `dart run build_runner build`. It's git-ignored, and `make lint-web`/`test-web` regenerate it. Don't edit it by hand. Web tests run in Chrome through `make test-web`, not plain `dart test`.
 - Never commit secrets. The LLM key lives in `.env`, which is git-ignored (template: `.env.example`).
 - Every REST call sends `X-User-Id` and `traceparent`. Errors use RFC 9457 problem+json.
 
