@@ -2,7 +2,7 @@
 
 The browser app: Dart 3 + [OverReact](https://github.com/Workiva/over_react) (function components and hooks; the history panel is a `UiComponent2` class component), OverReact Redux and built_value.
 
-- `web/`: the page (`index.html`) and entrypoint (`main.dart`), which mounts `App` into `#app`.
+- `web/`: the page (`index.html`) and entrypoint (`index.dart`), which mounts `App` into `#app`.
 - `lib/src/components/`: OverReact components. `App` is the root.
 - `test/`: browser tests, run in Chrome with [react_testing_library](https://github.com/Workiva/react_testing_library). `test/html_template.html` loads the React JS for every test file.
 
