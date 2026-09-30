@@ -12,6 +12,12 @@ linters:
     - noctx
     - revive
     - sloglint
+  settings:
+    sloglint:
+      # Log through an injected *slog.Logger and pass ctx when one is in
+      # scope, so request lines carry trace_id (docs/adr/0004).
+      no-global: all
+      context: scope
 
 formatters:
   enable:
