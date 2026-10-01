@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -32,6 +33,18 @@ type Service struct {
 	DefaultAddr string                   // listen address when HTTP_ADDR is unset
 	Routes      func(mux *http.ServeMux) // registers the service's handlers; may be nil
 	Ready       []Check                  // all must pass for /readyz to return 200
+
+	// Init, if set, runs before serving, to build what needs the config,
+	// such as a database pool. An error stops the service. The Deps it
+	// returns add to Routes and Ready.
+	Init func(ctx context.Context, cfg Config, logger *slog.Logger) (Deps, error)
+}
+
+// Deps is what Service.Init builds.
+type Deps struct {
+	Routes func(mux *http.ServeMux) // may be nil
+	Ready  []Check
+	Close  func() // runs after the server has stopped; may be nil
 }
 
 type health struct {
@@ -71,17 +84,33 @@ func (s Service) main() error {
 	return nil
 }
 
-// Run serves HTTP on ln until ctx is done, then stops accepting connections
-// and waits up to cfg.ShutdownTimeout for in-flight requests. If they don't
-// finish in time, it closes their connections and returns an error.
+// Run calls Init, if set, then serves HTTP on ln until ctx is done. Then it
+// stops accepting connections and waits up to cfg.ShutdownTimeout for
+// in-flight requests. If they don't finish in time, it closes their
+// connections and returns an error. Deps.Close runs last either way.
 func (s Service) Run(ctx context.Context, cfg Config, logger *slog.Logger, ln net.Listener) error {
+	var deps Deps
+	if s.Init != nil {
+		var err error
+		if deps, err = s.Init(ctx, cfg, logger); err != nil {
+			_ = ln.Close()
+			return fmt.Errorf("init: %w", err)
+		}
+		if deps.Close != nil {
+			defer deps.Close()
+		}
+	}
+	ready := append(slices.Clip(s.Ready), deps.Ready...)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, health{Status: "ok"})
 	})
-	mux.HandleFunc("GET /readyz", s.readyz(logger))
-	if s.Routes != nil {
-		s.Routes(mux)
+	mux.HandleFunc("GET /readyz", readyz(logger, ready))
+	for _, routes := range []func(*http.ServeMux){s.Routes, deps.Routes} {
+		if routes != nil {
+			routes(mux)
+		}
 	}
 	srv := &http.Server{
 		Handler:           httpx.Middleware(logger, mux),
@@ -111,12 +140,12 @@ func (s Service) Run(ctx context.Context, cfg Config, logger *slog.Logger, ln ne
 	return nil
 }
 
-func (s Service) readyz(logger *slog.Logger) http.HandlerFunc {
+func readyz(logger *slog.Logger, checks []Check) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), readyTimeout)
 		defer cancel()
 		var failed []string
-		for _, c := range s.Ready {
+		for _, c := range checks {
 			if err := c.Fn(ctx); err != nil {
 				failed = append(failed, fmt.Sprintf("%s: %v", c.Name, err))
 			}

@@ -20,17 +20,24 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name: "overrides",
-			env:  map[string]string{"HTTP_ADDR": "127.0.0.1:9000", "LOG_LEVEL": "debug", "SHUTDOWN_TIMEOUT": "3s"},
-			want: Config{Addr: "127.0.0.1:9000", LogLevel: slog.LevelDebug, ShutdownTimeout: 3 * time.Second},
+			env: map[string]string{
+				"HTTP_ADDR": "127.0.0.1:9000", "LOG_LEVEL": "debug", "SHUTDOWN_TIMEOUT": "3s",
+				"DATABASE_URL": "postgres://db:5432/ln", "MIGRATE_ON_START": "true",
+			},
+			want: Config{
+				Addr: "127.0.0.1:9000", LogLevel: slog.LevelDebug, ShutdownTimeout: 3 * time.Second,
+				DatabaseURL: "postgres://db:5432/ln", MigrateOnStart: true,
+			},
 		},
 		{name: "bad log level", env: map[string]string{"LOG_LEVEL": "nope"}, wantErr: []string{"LOG_LEVEL"}},
 		{name: "bad timeout", env: map[string]string{"SHUTDOWN_TIMEOUT": "ten"}, wantErr: []string{"SHUTDOWN_TIMEOUT"}},
 		{name: "zero timeout", env: map[string]string{"SHUTDOWN_TIMEOUT": "0s"}, wantErr: []string{"SHUTDOWN_TIMEOUT"}},
+		{name: "bad migrate flag", env: map[string]string{"MIGRATE_ON_START": "yes"}, wantErr: []string{"MIGRATE_ON_START"}},
 		{name: "timeout over 10s", env: map[string]string{"SHUTDOWN_TIMEOUT": "11s"}, wantErr: []string{"SHUTDOWN_TIMEOUT"}},
 		{
 			name:    "every error is reported",
-			env:     map[string]string{"LOG_LEVEL": "nope", "SHUTDOWN_TIMEOUT": "ten"},
-			wantErr: []string{"LOG_LEVEL", "SHUTDOWN_TIMEOUT"},
+			env:     map[string]string{"LOG_LEVEL": "nope", "SHUTDOWN_TIMEOUT": "ten", "MIGRATE_ON_START": "yes"},
+			wantErr: []string{"LOG_LEVEL", "SHUTDOWN_TIMEOUT", "MIGRATE_ON_START"},
 		},
 	}
 	for _, tt := range tests {

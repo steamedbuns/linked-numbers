@@ -6,10 +6,10 @@ MIGRATIONS := services/internal/db/migrations
 GOOSE = goose -dir $(MIGRATIONS) postgres "$(DATABASE_URL)"
 
 .DEFAULT_GOAL := help
-.PHONY: help up down clean ps logs psql db-migrate db-seed db-reset serve-web check lint-go lint-sqlc test-go lint-web test-web lint-api
+.PHONY: help up down clean ps logs psql db-migrate db-seed db-reset run-values-api serve-web check lint-go lint-sqlc test-go lint-web test-web lint-api
 
 help: ## List targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
 
 up: ## Start Postgres and Jaeger and wait until Postgres is healthy
 	$(COMPOSE) up -d --wait
@@ -38,6 +38,9 @@ db-seed: ## Insert the demo data into DATABASE_URL (skips rows that exist)
 db-reset: ## Roll back every migration in DATABASE_URL (deletes all data), then migrate and seed
 	$(GOOSE) reset
 	$(MAKE) db-migrate db-seed
+
+run-values-api: ## Run values-api on :8081 against DATABASE_URL, migrating on start
+	cd services && DATABASE_URL="$(DATABASE_URL)" MIGRATE_ON_START=true go run ./cmd/values-api
 
 serve-web: ## Serve the web app at http://localhost:8080
 	cd web && webdev serve web:8080

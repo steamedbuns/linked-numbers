@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -152,5 +153,66 @@ func TestRunForcesCloseAfterShutdownTimeout(t *testing.T) {
 	}
 	if elapsed := time.Since(begin); elapsed > time.Second {
 		t.Errorf("Run() returned after %s, want about 200ms", elapsed)
+	}
+}
+
+func TestRunInit(t *testing.T) {
+	var closed atomic.Bool
+	s := Service{
+		Ready: []Check{{"static", func(context.Context) error { return nil }}},
+		Init: func(_ context.Context, cfg Config, _ *slog.Logger) (Deps, error) {
+			if cfg.DatabaseURL != "postgres://db" {
+				t.Errorf("Init got DatabaseURL %q, want the config's", cfg.DatabaseURL)
+			}
+			return Deps{
+				Routes: func(mux *http.ServeMux) {
+					mux.HandleFunc("GET /hello", func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = io.WriteString(w, "hi")
+					})
+				},
+				Ready: []Check{{"dep", func(context.Context) error { return errors.New("down") }}},
+				Close: func() { closed.Store(true) },
+			}, nil
+		},
+	}
+	cfg := testConfig
+	cfg.DatabaseURL = "postgres://db"
+	base, cancel, done := start(t, s, cfg)
+
+	if status, _, body := get(t, base+"/hello"); status != http.StatusOK || string(body) != "hi" {
+		t.Errorf("GET /hello = %d %s, want Init's route", status, body)
+	}
+	status, _, body := get(t, base+"/readyz")
+	var p httpx.Problem
+	if err := json.Unmarshal(body, &p); err != nil {
+		t.Fatal(err)
+	}
+	if status != http.StatusServiceUnavailable || p.Detail != "not ready: dep: down" {
+		t.Errorf("GET /readyz = %d %q, want 503 naming Init's check only", status, p.Detail)
+	}
+	if closed.Load() {
+		t.Error("Close ran while serving")
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Errorf("Run() = %v", err)
+	}
+	if !closed.Load() {
+		t.Error("Close did not run after shutdown")
+	}
+}
+
+func TestRunInitError(t *testing.T) {
+	initErr := errors.New("no database")
+	s := Service{Init: func(context.Context, Config, *slog.Logger) (Deps, error) { return Deps{}, initErr }}
+	base, _, done := start(t, s, testConfig)
+	if err := <-done; !errors.Is(err, initErr) {
+		t.Errorf("Run() = %v, want the Init error", err)
+	}
+	// The listener is closed, so nothing is served.
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, base+"/healthz", nil)
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		_ = resp.Body.Close()
+		t.Error("GET /healthz succeeded after Init failed")
 	}
 }

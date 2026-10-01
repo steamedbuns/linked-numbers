@@ -3,8 +3,9 @@
 // A package's TestMain calls Main, which starts one Postgres container for
 // the test binary and builds two template databases in it: one migrated, one
 // migrated and seeded. Each New or NewSeeded call then clones a template into
-// a fresh database, so tests are isolated and can run in parallel. It needs
-// Docker (testcontainers-go).
+// a fresh database (NewEmpty clones template0, for code that migrates), so
+// tests are isolated and can run in parallel. It needs Docker
+// (testcontainers-go).
 package dbtest
 
 import (
@@ -12,6 +13,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -122,6 +124,12 @@ func NewSeeded(t testing.TB) *pgxpool.Pool {
 	return clone(t, seededDB)
 }
 
+// NewEmpty returns a pool on a new database with no migrations applied.
+func NewEmpty(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+	return clone(t, "template0")
+}
+
 func clone(t testing.TB, template string) *pgxpool.Pool {
 	t.Helper()
 	ctx := t.Context()
@@ -161,13 +169,15 @@ func SQLDB(t testing.TB, pool *pgxpool.Pool) *sql.DB {
 	return conn
 }
 
+// configFor parses a URL for database, so the pool's ConnString() names it
+// too: tests pass that to code that takes DATABASE_URL.
 func configFor(database string) (*pgxpool.Config, error) {
-	cfg, err := pgxpool.ParseConfig(adminURL)
+	u, err := url.Parse(adminURL)
 	if err != nil {
 		return nil, err
 	}
-	cfg.ConnConfig.Database = database
-	return cfg, nil
+	u.Path = "/" + database
+	return pgxpool.ParseConfig(u.String())
 }
 
 // exec runs one statement on the maintenance database. Names are generated
