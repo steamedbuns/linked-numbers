@@ -3,9 +3,10 @@ COMPOSE := docker compose -f deploy/compose/compose.yaml --env-file $(or $(wildc
 # The local stack's database (same default as .env.example); override to target another.
 DATABASE_URL ?= postgres://linked_numbers:linked_numbers@localhost:5432/linked_numbers?sslmode=disable
 MIGRATIONS := services/internal/db/migrations
+GOOSE = goose -dir $(MIGRATIONS) postgres "$(DATABASE_URL)"
 
 .DEFAULT_GOAL := help
-.PHONY: help up down clean ps logs psql db-migrate serve-web check lint-go test-go lint-web test-web lint-api
+.PHONY: help up down clean ps logs psql db-migrate db-seed db-reset serve-web check lint-go lint-sqlc test-go lint-web test-web lint-api
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
@@ -29,19 +30,29 @@ psql: ## Open psql on the local database
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 db-migrate: ## Apply pending migrations to DATABASE_URL (default: the local stack)
-	goose -dir $(MIGRATIONS) postgres "$(DATABASE_URL)" up
+	$(GOOSE) up
+
+db-seed: ## Insert the demo data into DATABASE_URL (skips rows that exist)
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -1 -q -f services/internal/db/seed.sql
+
+db-reset: ## Roll back every migration in DATABASE_URL (deletes all data), then migrate and seed
+	$(GOOSE) reset
+	$(MAKE) db-migrate db-seed
 
 serve-web: ## Serve the web app at http://localhost:8080
 	cd web && webdev serve web:8080
 
 # ---- Checks: CI runs these same targets (.github/workflows/ci.yml) ----------
 
-check: lint-go test-go lint-web test-web lint-api ## Run every CI check
+check: lint-go lint-sqlc test-go lint-web test-web lint-api ## Run every CI check
 
 lint-go: ## Lint and format-check Go; check go.mod is tidy
 	cd services && golangci-lint run ./... && go mod tidy -diff
 
-test-go: ## Run Go unit tests with the race detector
+lint-sqlc: ## Check the committed sqlc output (services/internal/store) is up to date
+	scripts/ci/check-sqlc.sh
+
+test-go: ## Run Go tests with the race detector (needs Docker for Postgres)
 	cd services && go test -race ./...
 
 # Generated *.g.dart files are git-ignored, so build them before analyzing.

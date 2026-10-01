@@ -1,9 +1,10 @@
 // Package dbtest gives tests a real, migrated Postgres database.
 //
 // A package's TestMain calls Main, which starts one Postgres container for
-// the test binary and migrates a template database in it. Each New call then
-// clones the template into a fresh database, so tests are isolated and can run
-// in parallel. It needs Docker (testcontainers-go).
+// the test binary and builds two template databases in it: one migrated, one
+// migrated and seeded. Each New or NewSeeded call then clones a template into
+// a fresh database, so tests are isolated and can run in parallel. It needs
+// Docker (testcontainers-go).
 package dbtest
 
 import (
@@ -30,7 +31,10 @@ import (
 // deploy/compose/compose.yaml.
 const Image = "postgres:16.15-alpine"
 
-const templateDB = "ln_migrated"
+const (
+	migratedDB = "ln_migrated"
+	seededDB   = "ln_seeded"
+)
 
 var (
 	adminURL string     // the container's maintenance database
@@ -66,37 +70,65 @@ func run(m *testing.M) int {
 		fmt.Fprintln(os.Stderr, "dbtest:", err)
 		return 1
 	}
-	if err := createTemplate(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, "dbtest: create template:", err)
+	if err := createTemplates(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "dbtest: create templates:", err)
 		return 1
 	}
 	return m.Run()
 }
 
-func createTemplate(ctx context.Context) error {
-	if err := exec(ctx, "CREATE DATABASE "+templateDB); err != nil {
+func createTemplates(ctx context.Context) error {
+	logger := slog.New(slog.DiscardHandler)
+	if err := exec(ctx, "CREATE DATABASE "+migratedDB); err != nil {
 		return err
 	}
-	cfg, err := configFor(templateDB)
+	cfg, err := configFor(migratedDB)
 	if err != nil {
 		return err
 	}
 	// Close every connection before cloning: Postgres refuses to copy a
 	// template that has other sessions.
-	conn := stdlib.OpenDB(*cfg.ConnConfig)
-	defer func() { _ = conn.Close() }()
-	return db.Migrate(ctx, conn, slog.New(slog.DiscardHandler))
+	sqlDB := stdlib.OpenDB(*cfg.ConnConfig)
+	err = db.Migrate(ctx, sqlDB, logger)
+	_ = sqlDB.Close()
+	if err != nil {
+		return err
+	}
+
+	if err := exec(ctx, "CREATE DATABASE "+seededDB+" TEMPLATE "+migratedDB); err != nil {
+		return err
+	}
+	if cfg, err = configFor(seededDB); err != nil {
+		return err
+	}
+	conn, err := pgx.ConnectConfig(ctx, cfg.ConnConfig)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	return db.Seed(ctx, conn, logger)
 }
 
-// New returns a pool on a new database cloned from the migrated template. The
-// database is dropped when the test ends.
+// New returns a pool on a new, migrated database with no rows. The database
+// is dropped when the test ends.
 func New(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+	return clone(t, migratedDB)
+}
+
+// NewSeeded is New with the seed data (db.Seed) already applied.
+func NewSeeded(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+	return clone(t, seededDB)
+}
+
+func clone(t testing.TB, template string) *pgxpool.Pool {
 	t.Helper()
 	ctx := t.Context()
 	name := fmt.Sprintf("t_%d_%d", os.Getpid(), seq.Add(1))
 
 	createMu.Lock()
-	err := exec(ctx, "CREATE DATABASE "+name+" TEMPLATE "+templateDB)
+	err := exec(ctx, "CREATE DATABASE "+name+" TEMPLATE "+template)
 	createMu.Unlock()
 	if err != nil {
 		t.Fatalf("dbtest: %v", err)
