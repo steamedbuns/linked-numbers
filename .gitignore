@@ -22,3 +22,6 @@ playwright-report/
 # Editors / OS
 .idea/
 .DS_Store
+
+# vibe-wise plugin
+/.vibe-wise/
