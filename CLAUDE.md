@@ -33,7 +33,7 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 - **Never use floating point for money.** Use `decimal` in Dart, `shopspring/decimal` in Go, and `NUMERIC(20,4)` in Postgres. Amounts travel as JSON strings (`"1250000.0000"`).
 - Every value edit writes the new value, exactly one `value_changes` row and a `pg_notify('values_changed', …)`, all in one transaction. `value_changes` is append-only.
 - Only values-api reads or writes the tables. The gateway only LISTENs.
-- Use parameterized SQL only, via sqlc. After changing a query or migration, regenerate (`./dev run bash -c 'cd services && sqlc generate'`) and commit the output. CI fails if it's stale.
+- Use parameterized SQL only, via sqlc. After changing a query or migration, regenerate (`./dev run bash -c 'cd services && sqlc generate'`) and commit the output. CI fails if it's stale (`make lint-sqlc`).
 - Generated Dart code (`*.g.dart`) comes from `dart run build_runner build`. It's git-ignored, and `make lint-web`/`test-web` regenerate it. Don't edit it by hand. Web tests run in Chrome through `make test-web`, not plain `dart test`.
 - Never commit secrets. The LLM key lives in `.env`, which is git-ignored (template: `.env.example`).
 - Every REST call sends `X-User-Id` and `traceparent`. Errors use RFC 9457 problem+json.
@@ -43,5 +43,5 @@ The host has only git, gh and Docker. **Go, Dart, Node, sqlc, goose, golangci-li
 - Name branches `LN-<epic>_<story>/<short_description>` (e.g. `LN-1_1/initial_setup`), and put the story ID in the PR title.
 - Keep PRs under about 400 changed lines. Each PR needs a description and a self-review, plus screenshots for UI changes.
 - Definition of done (spec, "Definition of done"): every acceptance criterion has an automated test, lint and format are clean, new endpoints are in OpenAPI, and new code paths emit spans and structured logs.
-- Before calling work done, run `./dev run make check`. It runs exactly what CI runs (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). Single areas: `make lint-go test-go`, `make lint-web test-web`, `make lint-api`.
+- Before calling work done, run `./dev run make check`. It runs exactly what CI runs (see [.github/workflows/ci.yml](.github/workflows/ci.yml)). Single areas: `make lint-go lint-sqlc test-go`, `make lint-web test-web`, `make lint-api`.
 - CI's `CI` check is required on `main`. When you add a check, add it as a Makefile target and call that target from a workflow job. Don't change the ruleset.

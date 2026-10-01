@@ -1,0 +1,28 @@
+# sqlc config. Generate with `sqlc generate` from this folder, and commit the
+# output: `make lint-sqlc` (in CI) fails if internal/store is stale.
+version: "2"
+sql:
+  - engine: postgresql
+    schema: internal/db/migrations # sqlc reads goose Up sections
+    queries: internal/db/queries
+    gen:
+      go:
+        package: store
+        out: internal/store
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        overrides:
+          # Never float for money: NUMERIC maps to shopspring/decimal.
+          - db_type: pg_catalog.numeric
+            go_type: github.com/shopspring/decimal.Decimal
+          - db_type: pg_catalog.numeric
+            nullable: true
+            go_type: github.com/shopspring/decimal.NullDecimal
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type: github.com/google/uuid.NullUUID
+          - db_type: timestamptz
+            go_type: time.Time

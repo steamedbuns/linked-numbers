@@ -16,8 +16,9 @@ Every binary starts from the service template ([ADR 0004](../docs/adr/0004-go-se
 | `internal/logging` | JSON slog logger that adds `trace_id`/`span_id` from the context |
 | `internal/httpx` | Request middleware (trace context, access log, panic recovery) and RFC 9457 problem responses |
 | `internal/buildinfo` | The VCS revision, logged as `version` |
-| `internal/db` | Goose migrations (embedded) and `Migrate` ([ADR 0005](../docs/adr/0005-database-schema-and-migrations.md)) |
-| `internal/db/dbtest` | Test helper: one Postgres container per test binary, a fresh migrated database per test |
+| `internal/db` | Goose migrations, seed data and queries (all embedded or generated from here); `Migrate` and `Seed` ([ADR 0005](../docs/adr/0005-database-schema-and-migrations.md)) |
+| `internal/db/dbtest` | Test helper: one Postgres container per test binary, a fresh migrated (`New`) or seeded (`NewSeeded`) database per test |
+| `internal/store` | sqlc-generated queries and models. Don't edit; regenerate |
 
 ## Configuration
 
@@ -43,4 +44,18 @@ The schema is in [internal/db/migrations](internal/db/migrations), as goose SQL 
 ./dev run goose -dir services/internal/db/migrations -s create add_something sql
 ```
 
-Apply migrations to the local stack (`make up` first) with `./dev run make db-migrate`. Tests that need Postgres call `dbtest.Main` from `TestMain` and `dbtest.New(t)` per test. They need Docker, which the dev container and CI both have.
+Against the local stack (`make up` first):
+
+| Command | Does |
+| --- | --- |
+| `./dev run make db-migrate` | Apply pending migrations |
+| `./dev run make db-seed` | Insert the demo data: 3 users, 12 values, 2 reports ([seed.sql](internal/db/seed.sql)). Existing rows are skipped |
+| `./dev run make db-reset` | Roll back every migration (deleting all data), then migrate and seed |
+
+Queries live in [internal/db/queries](internal/db/queries). After changing a query or a migration, regenerate `internal/store` and commit it. `make lint-sqlc` fails in CI if it is stale:
+
+```bash
+./dev run bash -c 'cd services && sqlc generate'
+```
+
+ Tests that need Postgres call `dbtest.Main` from `TestMain` and `dbtest.New(t)` per test. They need Docker, which the dev container and CI both have.

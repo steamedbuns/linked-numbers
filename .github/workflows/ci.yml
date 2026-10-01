@@ -35,7 +35,16 @@ jobs:
         with:
           version: v${{ steps.v.outputs.golangci_lint }}
           install-only: true
+      - name: Install sqlc
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL "https://github.com/sqlc-dev/sqlc/releases/download/v${SQLC}/sqlc_${SQLC}_linux_amd64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" sqlc
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+        env:
+          SQLC: ${{ steps.v.outputs.sqlc }}
       - run: make lint-go
+      - run: make lint-sqlc
       - run: make test-go
 
   web:

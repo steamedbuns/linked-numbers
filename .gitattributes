@@ -4,3 +4,5 @@ dev text eol=lf
 # Lock files: collapsed in GitHub diffs and left out of language stats.
 web/pubspec.lock linguist-generated=true
 services/go.sum linguist-generated=true
+# sqlc output (docs/adr/0005-database-schema-and-migrations.md); `make lint-sqlc` checks it is current.
+services/internal/store/** linguist-generated=true
