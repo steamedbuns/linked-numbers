@@ -31,7 +31,9 @@ paths:
       tags: [ops]
       operationId: getReadyz
       summary: Readiness probe
-      description: Returns 200 when every readiness check (such as the database ping) passes, and 503 naming the failed checks otherwise.
+      description: >-
+        Returns 200 when every readiness check passes, and 503 naming the failed checks otherwise.
+        values-api checks `postgres` (a ping) and `schema` (every migration applied).
       responses:
         "200":
           $ref: "#/components/responses/Healthy"
@@ -41,6 +43,11 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+              example:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                detail: "not ready: schema: not migrated, want version 1"
 components:
   responses:
     Healthy:

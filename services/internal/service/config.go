@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 )
 
@@ -16,6 +17,8 @@ type Config struct {
 	Addr            string        // HTTP_ADDR: listen address, e.g. ":8081"
 	LogLevel        slog.Level    // LOG_LEVEL: debug, info, warn or error
 	ShutdownTimeout time.Duration // SHUTDOWN_TIMEOUT: graceful shutdown budget, at most 10s
+	DatabaseURL     string        // DATABASE_URL: Postgres URL; services that need it check it's set
+	MigrateOnStart  bool          // MIGRATE_ON_START: apply migrations before serving (dev only)
 }
 
 // LoadConfig reads the config with getenv (os.Getenv outside tests). Unset
@@ -42,6 +45,14 @@ func LoadConfig(getenv func(string) string, defaultAddr string) (Config, error) 
 		default:
 			cfg.ShutdownTimeout = d
 		}
+	}
+	cfg.DatabaseURL = getenv("DATABASE_URL")
+	if v := getenv("MIGRATE_ON_START"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("MIGRATE_ON_START: %q is not a boolean", v))
+		}
+		cfg.MigrateOnStart = b
 	}
 	return cfg, errors.Join(errs...)
 }

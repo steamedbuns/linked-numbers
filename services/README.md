@@ -27,14 +27,17 @@ Every binary starts from the service template ([ADR 0004](../docs/adr/0004-go-se
 | `HTTP_ADDR` | the service's port, e.g. `:8081` | Listen address |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `SHUTDOWN_TIMEOUT` | `10s` | How long to wait for in-flight requests after SIGTERM (at most `10s`) |
+| `DATABASE_URL` | none; values-api requires it | Postgres URL, e.g. the local stack's in [.env.example](../.env.example) |
+| `MIGRATE_ON_START` | `false` | Apply pending migrations before serving. For dev; Kubernetes runs them as a Job (LN-9.2) |
 
 ## Run
 
 ```bash
-./dev run bash -c 'cd services && go run ./cmd/values-api'
+./dev run make up               # local Postgres
+./dev run make run-values-api   # DATABASE_URL of the local stack, MIGRATE_ON_START=true
 ```
 
-Then `curl localhost:8081/healthz` and `curl localhost:8081/readyz`.
+Then `curl localhost:8081/healthz` and `curl localhost:8081/readyz`. `/readyz` returns 503 until Postgres answers (`postgres` check) and every migration is applied (`schema` check).
 
 ## Database
 
@@ -58,4 +61,4 @@ Queries live in [internal/db/queries](internal/db/queries). After changing a que
 ./dev run bash -c 'cd services && sqlc generate'
 ```
 
- Tests that need Postgres call `dbtest.Main` from `TestMain` and `dbtest.New(t)` per test. They need Docker, which the dev container and CI both have.
+Tests that need Postgres call `dbtest.Main` from `TestMain`, then `dbtest.New(t)` (migrated), `dbtest.NewSeeded(t)` or `dbtest.NewEmpty(t)` per test. They need Docker, which the dev container and CI both have.
