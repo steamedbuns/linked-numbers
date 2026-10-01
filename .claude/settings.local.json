@@ -1,0 +1,14 @@
+{
+  "skillOverrides": {
+    "anthropic-skills:docs": "off",
+    "anthropic-skills:docx": "off",
+    "anthropic-skills:google-workspace": "off",
+    "anthropic-skills:morning": "off",
+    "anthropic-skills:pptx": "off",
+    "anthropic-skills:skill-creator": "off",
+    "anthropic-skills:xlsx": "off"
+  },
+  "enabledPlugins": {
+    "vibe-wise@anthropic-plugin-directory": true
+  }
+}
